@@ -1,0 +1,96 @@
+http://mobile.51cto.com/iphone-445945.htm
+AFNetworking使用总结
+
+分享类型：游戏开发相关
+
+1 将AFNetWorking文件夹导入项目
+
+2 添加类库 Security.framework、MobileCoreServices.framework、SystemConfiguration.framework
+
+3 在使用的地方 #import "AFNetworking.h"
+
+解决编译时警告：
+
+Prefix.pch文件中加入
+#import <SystemConfiguration/SystemConfiguration.h>
+#import <MobileCoreServices/MobileCoreServices.h>
+
+注：AFNetWorking使用了ARC ，在不使用ARC项目中使用时，对AFNetWorking的所有.m文件添加“-fobjc-arc”
+
+在使用ARC项目中，使用“不使用ARC”的类库时，对类库的.m文件添加“-fno-objc-arc”
+
+[plain] view plaincopy
+
+static NSString*const BaseURLString = @"http://www.raywenderlich.com/downloads/weather_sample/";
+// 1      NSString *weatherUrl = [NSStringstringWithFormat:@"%@weather.php?format=json",BaseURLString];      NSURL *url = [NSURLURLWithString:weatherUrl];      NSURLRequest *request = [NSURLRequestrequestWithURL:url];       // 2      AFJSONRequestOperation *operation =      [AFJSONRequestOperationJSONRequestOperationWithRequest:request                                                success:^(NSURLRequest*request, NSHTTPURLResponse *response, id JSON) {                                                   //                                                   NSDictionary*dicWeather = (NSDictionary *)JSON;                                                   NSLog(@"result:%@",dicWeather);                                                }                                                failure:^(NSURLRequest*request, NSHTTPURLResponse *response, NSError *error, id JSON) {                                                   UIAlertView*alertView = [[UIAlertView alloc] initWithTitle:@"Error RetrievingWeather"                                                                                                 message:[NSStringstringWithFormat:@"%@",error]                                                                                                delegate:self                                                                                        cancelButtonTitle:@"OK"                                                                                        otherButtonTitles: nil];                                                   [alertView show];                                                }];      // 5      [operation start];
+
+(1)根据基本的URL构造除完整的一个URL，然后通过这个完整的URL获得一个NSURL对象，然后根据这个url获得一个NSURLRequest。
+
+(2)AFJSONRequestOperation是一个完整的类，整合了从网络中获取数据并对JSON进行解析。
+
+(3)当请求成功，则运行成功块。在本例中，把解析出来的天气数据从JSON变量转换为一个字典(dictionary)，并将其存储在字典中。
+
+(4)如果运行出问题了，则运行失败块(failure block)，比如网络不可用。如果failure block被调用了，将会通过提示框显示错误信息。
+
+6.AFNetWorking异步加载图片
+
+[plain] view plaincopy
+
+[list=1](1)#import “UIImageView+AFNetworking.h”  (2)UIImageView *imageView = [[UIImageView alloc]initWithFrame:CGRectMake(40, 80, 40, 40)];      __weak UIImageView *_imageView = imageView;      [imageViewsetImageWithURLRequest:[[NSURLRequest alloc] initWithURL:[NSURLURLWithString:@"http://www.worldweatheronline.com/images/wsymbols01_png_64/wsymbol_0001_sunny.png"]]                     placeholderImage:[UIImage imageNamed:@"placeholder.png"]                             success:^(NSURLRequest *request,NSHTTPURLResponse *response, UIImage *image) {                                _imageView.image = image;
+[_imageView setNeedsDisplay];                             }                             failure:^(NSURLRequest *request, NSHTTPURLResponse*response, NSError *error) {                                ;                             }];      [self.view addSubview:imageView];
+
+7.GET 和POST请求
+
+(1).构建一个baseURL，以及一个参数字典，并将这两个变量传给AFHTTPClient.
+
+(2).将AFJSONRequestOperation注册为HTTP的操作, 这样就可以跟之前的示例一样，可以获得解析好的JSON数据。
+
+(3).做了一个GET请求，这个请求有一对block：success和failure。
+
+(4).POST请求跟GET一样
+
+[plain]view plaincopy
+
+[list=1]AFHTTPClient *client= [[AFHTTPClient alloc] initWithBaseURL:baseURL];  [clientregisterHTTPOperationClass:[AFJSONRequestOperation class]];  [clientsetDefaultHeader:@"Accept" value:@"application/json"];  [client postPath:@"weather.php"                parameters:parameters                  success:^(AFHTTPRequestOperation *operation, id responseObject) {                       self.weather =responseObject;                       self.title = @"HTTPPOST";                       [self.tableViewreloadData];                   }                  failure:^(AFHTTPRequestOperation *operation, NSError*error) {                       UIAlertView *av =[[UIAlertView alloc] initWithTitle:@"Error Retrieving Weather"                                                                   message:[NSStringstringWithFormat:@"%@",error]                                                                  delegate:nil                                                         cancelButtonTitle:@"OK" otherButtonTitles:nil];                       [av show];                    }           ];
+[client getPath:@"weather.php"               parameters:parameters                 success:^(AFHTTPRequestOperation *operation, id responseObject) {                      self.weather =responseObject;                      self.title = @"HTTP GET";                      [self.tableViewreloadData];                  }                 failure:^(AFHTTPRequestOperation *operation, NSError*error) {                      UIAlertView *av =[[UIAlertView alloc] initWithTitle:@"Error Retrieving Weather"                                                                   message:[NSStringstringWithFormat:@"%@",error]                                                                 delegate:nil                                                        cancelButtonTitle:@"OK" otherButtonTitles:nil];                      [av show];
+}           ];
+
+另外，请求方式可以创建一个类继承AFHTTPClient ，官方的例子就是这样写的。
+
+状态栏设置
+
+在Appdelegate里面的 - (BOOL)application:(UIApplication *)application
+
+didFinishLaunchingWithOptions:(NSDictionary *)launchOptions 方法中添加 [[AFNetworkActivityIndicatorManager sharedManager] setEnabled:YES];用来给用户做出网络访问的提示。
+
+请求超时设置
+
+timeout和参数都是在NSURLRequest/NSMutableURLRequest设置的
+
+[list=1]
+NSMutableURLRequest *request = [client requestWithMethod:@"GET" path:@"/" parameters:nil];//这里的parameters:参数就是你的第二个问题如何设置参数
+[request setTimeoutInterval:120];
+AFHTTPRequestOperation *operation = [client HTTPRequestOperationWithRequest:request success:^{...} failure:^{...}];
+[client enqueueHTTPRequestOperation:operation];
+
+如果你是继承了AFHTTPClient
+
+就需要override一个方法requestWithMethod
+
+- (NSMutableURLRequest *)requestWithMethod:(NSString *)method path:(NSString *)path parameters:(NSDictionary *)parameters{
+NSMutableURLRequest *request = [super requestWithMethod:method path:path parameters:parameters];
+[request setTimeoutInterval:15];
+return request; }
+
+这个时候的参数设置是调用
+
+[self postPath:@"" parameters:nil //参数
+success:^(AFHTTPRequestOperation *operation, id responseObject) {
+if (success) {
+success((AFJSONRequestOperation *)operation, responseObject);
+}
+} failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+if (failure) {
+failure((AFJSONRequestOperation *)operation, error);
+}
+}];
